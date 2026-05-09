@@ -9,7 +9,7 @@ import {
     type GridRowModel,
 
 } from "@mui/x-data-grid";
-import { Pencil, Save, Trash2, X } from "lucide-react";
+import { Pencil, Save,  X } from "lucide-react";
 
 
 

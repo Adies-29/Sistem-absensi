@@ -28,9 +28,7 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
-const onSubmit = (data: FormData) => {
-    console.log(data);
-};
+
 
 
 
