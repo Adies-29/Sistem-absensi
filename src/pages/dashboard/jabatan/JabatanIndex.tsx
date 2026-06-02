@@ -1,29 +1,67 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Briefcase, Users } from "lucide-react"; // Icon baru untuk jabatan
+import { Briefcase, Users, Loader2 } from "lucide-react"; 
 import Button from "../../../components/ui/Button";
 import TabelJabatan from "../../../components/ui/tabel/tabelJabatan/TabelJabatan";
-// Import tabelmu nanti: import TabelJabatan from "../../../components/ui/tabel/TabelJabatan";
+import type { JabatanData } from "../../../types";
 
 export default function JabatanIndex() {
     const navigate = useNavigate();
 
-    // --- DATA DUMMY JABATAN ---
-    const dummyJabatan = [
-        { id: "jbt-1", nama_jabatan: "Admin 1", departemen: "Administrasi", jumlah_karyawan: 2 },
-        { id: "jbt-2", nama_jabatan: "Satpam", departemen: "Administrasi", jumlah_karyawan: 4 },
-        { id: "jbt-3", nama_jabatan: "Molder 1", departemen: "Produksi", jumlah_karyawan: 15 },
-        { id: "jbt-4", nama_jabatan: "Helper", departemen: "Produksi", jumlah_karyawan: 5 },
-        { id: "jbt-5", nama_jabatan: "Teknisi Mesin", departemen: "Maintenance", jumlah_karyawan: 1 },
-    ];
+    // 2. State untuk menyimpan data dari Database & status Loading
+    const [dataJabatan, setDataJabatan] = useState<JabatanData[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const totalJabatan = dummyJabatan.length;
-    // Menghitung total semua karyawan dari semua jabatan
-    const totalKaryawan = dummyJabatan.reduce((acc, curr) => acc + curr.jumlah_karyawan, 0);
+    // 3. Fungsi FETCH dari Backend (READ)
+    const fetchJabatan = async () => {
+        setIsLoading(true);
+        try {
+            // Tembak API Backend
+            const response = await fetch("http://localhost:3000/api/v1/jabatan", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                   
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error("Gagal memuat data dari server");
+            }
+
+            const result = await response.json();
+            
+            // 4. MAPPING DATA: Sesuaikan bentuk data backend ke bentuk dummy-mu sebelumnya
+            const mappedData: JabatanData[] = result.data.map((item: any) => ({
+                id: item.id,
+                nama_jabatan: item.nama_jabatan,
+                departemen: item.departemen || "Tanpa Departemen", 
+                departemen_id: item.departemen_id,
+                jumlah_karyawan: item.jumlah_karyawan || 0
+            }));
+
+            setDataJabatan(mappedData);
+
+        } catch (error) {
+            console.error("Error fetching jabatan:", error);
+            alert("Gagal memuat data jabatan. Pastikan backend berjalan.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // 5. Jalankan Fetch saat halaman dibuka
+    useEffect(() => {
+        fetchJabatan();
+    }, []);
+
+   
+    const totalJabatan = dataJabatan.length;
+    const totalPegawai = dataJabatan.reduce((acc, curr) => acc + (curr.jumlah_karyawan || 0), 0);
 
     return (
         <div className="flex flex-col gap-6 w-full">
 
-            {/* 1. BAGIAN STATISTIK */}
             <div className="flex flex-wrap gap-4">
                 {/* Kotak 1: Total Jabatan */}
                 <div className="bg-white border border-gray-300 rounded-xl p-4 min-w-48 shadow-sm flex items-center gap-4">
@@ -43,13 +81,13 @@ export default function JabatanIndex() {
                     </div>
                     <div>
                         <p className="text-gray-500 text-sm font-medium">Karyawan Terisi</p>
-                        <p className="text-2xl font-bold text-black">{totalKaryawan}</p>
+                        <p className="text-2xl font-bold text-black">{totalPegawai}</p>
                     </div>
                 </div>
             </div>
 
             {/* 2. BAGIAN TABEL DAN TOMBOL */}
-            <section className="bg-white border border-gray-300 rounded-2xl p-4 shadow-sm w-full">
+            <section className="bg-white border border-gray-300 rounded-2xl p-4 shadow-sm w-full min-h-100">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-start mb-6 gap-4">
                     <h2 className="text-lg font-bold text-black border-l-4 border-red-600 pl-2 mt-1">
                         Data Jabatan
@@ -64,12 +102,15 @@ export default function JabatanIndex() {
                     </div>
                 </div>
 
-                {/* 3. PEMANGGILAN KOMPONEN TABEL NANTI DI SINI */}
-                {/* <TabelJabatan data={dummyJabatan} /> */}
-               
-                <TabelJabatan data={dummyJabatan}  />
-                
-
+                {/* 3. PEMANGGILAN KOMPONEN TABEL */}
+                {isLoading ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                        <Loader2 className="animate-spin mb-4 text-red-600" size={32} />
+                        <p>Memuat data dari database...</p>
+                    </div>
+                ) : (
+                    <TabelJabatan data={dataJabatan} />
+                )}
             </section>
         </div>
     );

@@ -1,122 +1,168 @@
-import { useEffect } from 'react'; // 1. TAMBAHKAN IMPORT INI
+import { useEffect, useState } from 'react'; // 1. TAMBAHKAN IMPORT INI
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Award, Banknote } from 'lucide-react';
+import { ArrowLeft, Award, Banknote, Loader2 } from 'lucide-react';
 import Button from '../../../components/ui/Button';
 import { z } from 'zod';
 
-import { useForm, type SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Input } from '../../../components/ui/InputText'; 
+import { useAuthStore } from '../../../store/useAuthStore';
 
 
 const schema = z.object({
-    upahKehadiran: z.coerce.number().min(1, "Upah Kehadiran harus diisi"),
-    UpahLemburperJam: z.coerce.number().min(1, "Upah Lembur harus diisi"),
-    BonusDisiplinHarian: z.coerce.number().min(1, "Bonus Disiplin harus diisi"),
-    BonusKerapianHarian: z.coerce.number().min(1, "Bonus Kerapian harus diisi"),
-    BonusFullMingguan6: z.coerce.number().min(1, "Bonus Mingguan (6 Hari) harus diisi"),
-    BonusFullMingguan5: z.coerce.number().min(1, "Bonus Mingguan (5 Hari) harus diisi"),
-    BonusMingguHarian: z.coerce.number().min(1, "Bonus Minggu Harian harus diisi"),
-    BonusLemburTahunan: z.coerce.number().min(1, "Bonus Lembur Tahunan harus diisi"),
+    upah_per_kehadiran: z.coerce.number().min(0, "Tidak boleh minus"),
+    upah_lembur_per_jam: z.coerce.number().min(0, "Tidak boleh minus"),
+    bonus_disiplin_harian: z.coerce.number().min(0, "Tidak boleh minus"),
+    bonus_kerapian_harian: z.coerce.number().min(0, "Tidak boleh minus"),
+    bonus_minggu_6_hari: z.coerce.number().min(0, "Tidak boleh minus"),
+    bonus_minggu_5_hari: z.coerce.number().min(0, "Tidak boleh minus"),
+    bonus_minggu_harian: z.coerce.number().min(0, "Tidak boleh minus"),
+    bonus_lembur_tahunan: z.coerce.number().min(0, "Tidak boleh minus"),
 });
 
-const dummyJabatan = [
-    { id: "jbt-1", nama_jabatan: "Admin 1", departemen: "Administrasi" },
-    { id: "jbt-2", nama_jabatan: "Satpam", departemen: "Administrasi" },
-    { id: "jbt-3", nama_jabatan: "Molder 1", departemen: "Produksi" },
-    { id: "jbt-4", nama_jabatan: "Helper", departemen: "Produksi" },
-    { id: "jbt-5", nama_jabatan: "Teknisi Mesin", departemen: "Maintenance" },
-];
-
-type GajiFormValues = z.infer<typeof schema>;
+type FormData = z.infer<typeof schema>;
 
 export default function AturGajiJabatan() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const token = useAuthStore((state) => (state.token));
+    const [isSaving, setIsSaving] = useState(false);
+    const [isFetchingData, setIsFetchingData] = useState(true)
+    const [jabatanInfo, setJabatanInfo] = useState({ nama_jabatan: "Loading...", departemen: "..." });
 
     const {
         register,
         handleSubmit,
-        reset, // 2. KELUARKAN FUNGSI RESET DI SINI
+        reset, 
         formState: { errors }
-    } = useForm<GajiFormValues>({
+    } = useForm<FormData>({
         resolver: zodResolver(schema) as any, 
         defaultValues: {
-            upahKehadiran: 0,
-            UpahLemburperJam: 0,
-            BonusDisiplinHarian: 0,
-            BonusKerapianHarian: 0,
-            BonusFullMingguan6: 0,
-            BonusFullMingguan5: 0,
-            BonusMingguHarian: 0,
-            BonusLemburTahunan: 0,
+            upah_per_kehadiran: 0,
+            upah_lembur_per_jam: 0,
+            bonus_disiplin_harian: 0,
+            bonus_kerapian_harian: 0,
+            bonus_minggu_6_hari: 0,
+            bonus_minggu_5_hari: 0,
+            bonus_minggu_harian: 0,
+            bonus_lembur_tahunan: 0,
         }
     });
 
     // 4. EFEK UNTUK UPDATE (MENAMPILKAN DATA LAMA)
     useEffect(() => {
-        // Simulasi: Kalau yang diklik "Molder 1" (jbt-3), munculkan data gaji lamanya
-        if (id === "jbt-3") {
-            const dataGajiLama = {
-                upahKehadiran: 120000,
-                UpahLemburperJam: 15000,
-                BonusDisiplinHarian: 5000,
-                BonusKerapianHarian: 5000,
-                BonusFullMingguan6: 50000,
-                BonusFullMingguan5: 30000,
-                BonusMingguHarian: 10000,
-                BonusLemburTahunan: 1500000,
-            };
-            reset(dataGajiLama); 
-        }
-    }, [id, reset]);
+        const loadGajiJabatan = async () =>{
+            try {
+                setIsFetchingData(true)
 
-    const onSubmit: SubmitHandler<GajiFormValues> = (data) => {
-        console.log("Data siap dikirim ke database:", data);
-        alert("Gaji berhasil disimpan/diperbarui!");
+                const response = await fetch(`http://localhost:3000/api/v1/jabatan/${id}`, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type" : "application/json",
+                        "Authorization" : `Bearer ${token}`
+                    }
+                });
+
+                const result = await response.json()
+                const gaji = result.data;
+
+                if(response.ok && result.success){
+                    setJabatanInfo({
+                        nama_jabatan: gaji.nama_jabatan || "Nama Jabatan",
+                        departemen: gaji.departemen?.nama_departemen || "Umum"
+                    });
+                    
+                    
+                    reset({
+                        upah_per_kehadiran: gaji.upah_per_kehadiran || 0,
+                        upah_lembur_per_jam: gaji.upah_lembur_per_jam || 0,
+                        bonus_disiplin_harian: gaji.bonus_disiplin_harian || 0, 
+                        bonus_kerapian_harian: gaji.bonus_kerapian_harian || 0,
+                        bonus_minggu_6_hari: gaji.bonus_minggu_6_hari || 0,
+                        bonus_minggu_5_hari: gaji.bonus_minggu_5_hari || 0,
+                        bonus_minggu_harian: gaji.bonus_minggu_harian || 0,
+                        bonus_lembur_tahunan: gaji.bonus_lembur_tahunan || 0,
+                    });
+                } else{
+                    alert("Gagal memuat data konfigurasi Gaji Jabatan.");
+                    navigate(-1);
+                }
+            } catch (error) {
+                console.error("Error fetching Gaji Jabatan details:", error);
+                alert("Terjadi kesalahan koneksi saat mengambil data server.");
+            } finally{
+                setIsFetchingData(false)
+            }
+        };
+        
+        if (id) loadGajiJabatan();
+    }, [id, token, reset, navigate] );
+
+    const onSubmit = async (data: FormData) => {   
+        setIsSaving(true)
+        try {
+            const response = await fetch(`http://localhost:3000/api/v1/jabatan/${id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type" : "application/json",
+                    "Authorization" : `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json()
+
+            if (response.ok && result.success){
+                alert(`Sukses! Perubahan konfigurasi Gaji Jabatan berhasil diperbarui.`);
+               navigate('/dashboard/gaji-tunjangan', { state: { tab: 'master' } });
+            } else{
+                alert("Gagal menyimpan ke database. Coba lagi.");
+            }
+        } catch (error) {
+            console.error("Error Submit:", error);
+            alert("Terjadi kesalahan jaringan.");
+        } finally{
+            setIsSaving(false)
+        }   
     };
 
     // 5. FUNGSI UNTUK MERESET (MENGHAPUS) GAJI
     const handleResetGaji = () => {
-        const confirmDelete = window.confirm("Yakin ingin menghapus dan mereset semua gaji jabatan ini?");
-        if (confirmDelete) {
+        const confirmReset = window.confirm("Yakin ingin menghapus dan mereset semua gaji jabatan ini?");
+        if (confirmReset) {
             reset({
-                upahKehadiran: 0,
-                UpahLemburperJam: 0,
-                BonusDisiplinHarian: 0,
-                BonusKerapianHarian: 0,
-                BonusFullMingguan6: 0,
-                BonusFullMingguan5: 0,
-                BonusMingguHarian: 0,
-                BonusLemburTahunan: 0,
+                upah_per_kehadiran: 0,
+                upah_lembur_per_jam: 0,
+                bonus_disiplin_harian: 0,
+                bonus_kerapian_harian: 0,
+                bonus_minggu_6_hari: 0,
+                bonus_minggu_5_hari: 0,
+                bonus_minggu_harian: 0,
+                bonus_lembur_tahunan: 0,
             });
             alert("Data gaji berhasil direset!");
         }
     };
 
-    const jabatan = dummyJabatan.find(dept => dept.id === id);
-    if (!jabatan) {
-        return (
-            <div className="flex flex-col items-center justify-center h-64 gap-4">
-                <p className="text-xl font-bold text-gray-500">Jabatan tidak ditemukan!</p>
-                <button onClick={() => navigate(-1)} className="px-4 py-2 bg-red-600 text-white rounded-md">Kembali</button>
-            </div>
-        );
-    }
-
     return (
         <div className="flex flex-col gap-6 w-full">
-            
+
+            {isFetchingData && (
+                <div className="absolute inset-0 z-10 bg-white/60 flex items-center justify-center rounded-xl backdrop-blur-sm min-h-125">
+                    <Loader2 className="animate-spin text-blue-600" size={40} />
+                </div>
+            )}
             {/* HEADER HALAMAN */}
             <div className="bg-white border border-gray-300 rounded-xl p-5 shadow-sm flex justify-between items-center">
                 <div>
                     <h2 className="text-xl text-gray-500 font-semibold mb-1">Pengaturan Gaji & Tunjangan</h2>
                     <div className="flex items-center gap-2">
-                        <h2 className="text-2xl font-bold text-black border-l-4 border-yellow-500 pl-2">
-                            {jabatan.nama_jabatan}
-                        </h2>
-                        <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-bold ml-2">
-                            Dept: {jabatan.departemen}
+                        <h1 className="text-2xl font-extrabold text-gray-900">
+                            {jabatanInfo.nama_jabatan}
+                        </h1>
+                        <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-bold border border-gray-200">
+                            Dept: {jabatanInfo.departemen}
                         </span>
                     </div>
                 </div>
@@ -145,7 +191,7 @@ export default function AturGajiJabatan() {
                             type="number" 
                             placeholder="Masukkan upah kehadiran"
                             register={register} 
-                            error={errors.upahKehadiran?.message} 
+                            error={errors.upah_per_kehadiran?.message} 
                         />
                         <Input 
                             label="Upah Lembur (Rp/Jam)" 
@@ -153,7 +199,7 @@ export default function AturGajiJabatan() {
                             type="number" 
                             placeholder="Masukkan upah lembur"
                             register={register} 
-                            error={errors.UpahLemburperJam?.message} 
+                            error={errors.upah_lembur_per_jam?.message} 
                         />
                          <Input 
                             label="Bonus Lembur Tahunan (Rp)" 
@@ -161,7 +207,7 @@ export default function AturGajiJabatan() {
                             type="number" 
                             placeholder="Masukkan bonus tahunan"
                             register={register} 
-                            error={errors.BonusLemburTahunan?.message} 
+                            error={errors.bonus_lembur_tahunan?.message} 
                         />
                     </section>
 
@@ -176,7 +222,8 @@ export default function AturGajiJabatan() {
                             nama="BonusDisiplinHarian" 
                             type="number" 
                             placeholder="Masukkan bonus disiplin"
-                            register={register} 
+                            register={register}
+                            error={errors.bonus_disiplin_harian?.message} 
                         />
                         <Input 
                             label="Bonus Kerapian Harian (Rp)" 
@@ -184,6 +231,7 @@ export default function AturGajiJabatan() {
                             type="number" 
                             placeholder="Masukkan bonus kerapian"
                             register={register} 
+                            error={errors.bonus_kerapian_harian?.message}
                         />
                         
                         <div className="grid grid-cols-2 gap-4">
@@ -193,6 +241,7 @@ export default function AturGajiJabatan() {
                                 type="number" 
                                 placeholder="Rp"
                                 register={register} 
+                                error={errors.bonus_minggu_5_hari?.message}
                             />
                             <Input 
                                 label="Bonus Full (6 Hari)" 
@@ -200,6 +249,7 @@ export default function AturGajiJabatan() {
                                 type="number" 
                                 placeholder="Rp"
                                 register={register} 
+                                error={errors.bonus_minggu_6_hari?.message}
                             />
                             <Input 
                                 label="Bonus Harian)" 
@@ -207,6 +257,7 @@ export default function AturGajiJabatan() {
                                 type="number" 
                                 placeholder="Rp"
                                 register={register} 
+                                error={errors.bonus_minggu_harian?.message}
                             />
                         </div>
                     </section>
@@ -224,7 +275,12 @@ export default function AturGajiJabatan() {
                     <div className="flex gap-3">
                         <Button type="button" variant="secondary" label="Batal" 
                             onClick={() => navigate('/dashboard/gaji-tunjangan', { state: { tab: 'master' } })} />
-                        <Button type="submit" label="Simpan Pengaturan" />
+                        <Button 
+                            type="submit" 
+                            disabled={isSaving}
+                            label={isSaving ? "Menyimpan..." : "Simpan Pengaturan"}
+                            icon={isSaving ? <Loader2 className="animate-spin" size={16} /> : undefined} 
+                            />
                     </div>
                 </div>
             </form>

@@ -2,47 +2,84 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft} from 'lucide-react';
 import Button from '../../../components/ui/Button';
 import { z } from 'zod';
-import { useForm, type SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Input } from '../../../components/ui/InputText'; 
+import { useEffect, useState } from 'react';
 
-// Import komponen Input buatanmu
-import { Input } from '../../../components/ui/InputText'; // Sesuaikan path-nya ya
 
-// 1. Definisikan Schema Zod (Hanya 2 kolom yang wajib diisi saat awal bikin jabatan)
 const schema = z.object({
     nama_jabatan: z.string().min(2, "Nama Jabatan minimal 2 karakter"),
     departemen_id: z.string().min(1, "Departemen wajib dipilih"),
 });
 
-type FormValues = z.infer<typeof schema>;
+type FormData = z.infer<typeof schema>;
+interface DepartemenItem {
+    id: string;
+    nama_departemen: string;
+}
 
 export default function AddJabatan() {
     const navigate = useNavigate();
+    const [isLoading, setIsLoading] = useState(false);
+    const [departemenList, setDepartemenList] =  useState<DepartemenItem[]>([]);
 
     const {
         register,
         handleSubmit,
         formState: { errors }
-    } = useForm<FormValues>({
+    } = useForm<FormData>({
         resolver: zodResolver(schema),
     });
 
-    // 2. Fungsi saat tombol Simpan diklik
-    const onSubmit: SubmitHandler<FormValues> = (data) => {
-        console.log("Data Jabatan Baru siap dikirim:", data);
-        alert("Jabatan berhasil ditambahkan!");
+    //Mengambil data departemen
+    useEffect(() => {
+        const fetchDepartemen = async () =>{
+            try {
+                const response = await fetch(`http://localhost:3000/api/v1/departemen`);
+                const result = await response.json();
 
-        // Nanti taruh fungsi Axios.post() di sini
-        // Setelah berhasil, arahkan kembali ke halaman tabel jabatan
-        navigate('/dashboard/jabatan');
+                if (response.ok){
+                    setDepartemenList(result.data)
+                }
+            } catch (error) {
+                console.error("Gagal mengambil data departemen:", error);
+            }
+        };
+        fetchDepartemen();
+    }, []);
+
+
+    // tombol Simpan diklik
+   const onSubmit = async (data: FormData) => {
+        setIsLoading(true)
+        try {
+            const response = await fetch("http://localhost:3000/api/v1/jabatan", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    nama_jabatan: data.nama_jabatan,
+                    departemen_id: parseInt(data.departemen_id)
+                }),
+            });
+            const result = await response.json();
+
+           if (response.ok) {
+                alert("Berhasil! Jabatan baru telah ditambahkan.");
+                navigate("/dashboard/jabatan"); 
+            } else {
+                alert(`Gagal: ${result.message}`);
+            }
+
+        } catch (error: any) {
+            console.error("CREATE JABATAN ERROR!:", error);
+            alert(error.message || "Gagal terhubung ke server.");
+        }finally {
+            setIsLoading(false);
+        }
     };
-
-    // Data dummy departemen (Nanti kamu fetch dari API/Database)
-    const dummyDepartemen = [
-        { id: "1", nama: "Administrasi" },
-        { id: "2", nama: "Produksi" },
-        { id: "3", nama: "Maintenance" },
-    ];
 
     return (
         <div className="p-6 max-w-2xlmx-auto w-full">
@@ -79,14 +116,15 @@ export default function AddJabatan() {
                                 Pilih Departemen
                             </label>
                             <select
-                                id="departemen_id"
                                 {...register("departemen_id")}
-                                className="border border-gray-300 rounded px-3 py-2 outline-none focus:border-red-500 bg-white"
+                                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all bg-white
+                                ${errors.departemen_id ? 'border-red-500' : 'border-gray-300'}`}
+                                defaultValue=""
                             >
                                 <option value="">-- Pilih Departemen --</option>
-                                {dummyDepartemen.map((dept) => (
+                                {departemenList.map((dept) => (
                                     <option key={dept.id} value={dept.id}>
-                                        {dept.nama}
+                                        {dept.nama_departemen}
                                     </option>
                                 ))}
                             </select>
@@ -99,7 +137,7 @@ export default function AddJabatan() {
                         <div className="flex justify-end gap-3 mt-4 pt-5 border-t border-gray-200">
                             <Button
                                 type="submit"
-                                label="Simpan Jabatan"
+                                label={isLoading ? "Menyimpan..." : "SImpan"}
                             />
                             <Button
                                 type="button"
@@ -107,19 +145,12 @@ export default function AddJabatan() {
                                 label="Batal"
                                 onClick={() => navigate(-1)}
                             />
-                            
+
                         </div>
 
                     </div>
-
-
-
                 </form>
-
             </div>
-
-
-
         </div>
     );
 }

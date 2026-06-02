@@ -21,7 +21,7 @@ export default function Sidebar({ isOpen, closeSidebar }: SidebarProps) {
 
     const navItems = [
         { title: "Monitoring", path: "/dashboard", isEnd: true, icon: LaptopMinimal },
-        { title: "Data Karyawan", path: "/dashboard/data-karyawan", isEnd: false, icon: Users },
+        { title: "Data Pegawai", path: "/dashboard/data-pegawai", isEnd: false, icon: Users },
         { title: "Data Departemen", path: "/dashboard/departemen", isEnd: false, icon: Layers },
         { title: "Data Jabatan", path: "/dashboard/jabatan", isEnd: false, icon: Rows2 },
         { title: "Rekap Data", path: "/dashboard/rekap-data", isEnd: false, icon: File },

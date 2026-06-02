@@ -6,14 +6,14 @@ import DashboardLayout from './layouts/DashboardLayout';
 import DashboardIndex from './pages/dashboard/DashboardIndex';
 import AuthLayout from './layouts/AuthLayout';
 import Login from './pages/Login';
-import DataKarywanIndex from './pages/dashboard/karyawan/KaryawanIndex';
+import DataKarywanIndex from './pages/dashboard/pegawai/PegawaiIndex';
 import RekapDataIndex from './pages/dashboard/rekapdata/RekapDataIndex';
 import JadwalShiftIndex from './pages/dashboard/jadwalshift/JadwalShiftIndex';
 import DepartemenIndex from './pages/dashboard/departemen/DepartemenIndex';
-import AddKaryawan from './pages/dashboard/karyawan/AddKaryawan';
+import AddKaryawan from './pages/dashboard/pegawai/AddPegawai';
 import AddDepartemen from './pages/dashboard/departemen/AddDepartemen';
 import DetailDepartemen from './pages/dashboard/departemen/DetailDepartemen';
-import DetailKaryawan from './pages/dashboard/karyawan/DetailKarywan';
+import DetailKaryawan from './pages/dashboard/pegawai/DetailPegawai';
 import GajiTunjanganIndex from './pages/dashboard/gajitunjangan/GajiTunjanganIndex';
 import JabatanIndex from './pages/dashboard/jabatan/JabatanIndex';
 import AturGajiJabatan from './pages/dashboard/gajitunjangan/AturGajiJabatan';
@@ -21,6 +21,10 @@ import AddJabatan from './pages/dashboard/jabatan/AddJabatan';
 import Home from './pages/Home';
 import AddShift from './pages/dashboard/jadwalshift/AddShift';
 import EditShift from './pages/dashboard/jadwalshift/EditShift';
+import EditPegawai from './pages/dashboard/pegawai/EditPegawai';
+import DetailPegawai from './pages/dashboard/pegawai/DetailPegawai';
+import AddPegawai from './pages/dashboard/pegawai/AddPegawai';
+import PegawaiIndex from './pages/dashboard/pegawai/PegawaiIndex';
 
 function App() {
   return (
@@ -40,9 +44,10 @@ function App() {
             <Route path="/dashboard" element={<DashboardIndex />} />
 
 
-            <Route path="/dashboard/data-karyawan" element={<DataKarywanIndex />} />
-            <Route path="/dashboard/data-karyawan/tambah-karyawan" element={<AddKaryawan />} />
-            <Route path="/dashboard/data-karyawan/:id" element={<DetailKaryawan />} />
+            <Route path="/dashboard/data-pegawai" element={<PegawaiIndex />} />
+            <Route path="/dashboard/data-pegawai/tambah-pegawai" element={<AddPegawai />} />
+            <Route path="/dashboard/data-pegawai/:id" element={<DetailPegawai />} />
+            <Route path="/dashboard/data-pegawai/edit/:id" element={<EditPegawai />} />
 
 
             <Route path="/dashboard/departemen" element={<DepartemenIndex />} />

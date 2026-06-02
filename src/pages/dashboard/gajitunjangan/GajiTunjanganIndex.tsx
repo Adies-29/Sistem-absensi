@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Wallet, TrendingDown, TrendingUp } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Button from '../../../components/ui/Button';
@@ -11,36 +11,118 @@ import dayjs, { Dayjs } from 'dayjs';
 
 import { TabelMasterGaji, type MasterGajiData } from '../../../components/ui/tabel/tabelGaji/TabelMasterGaji';
 import { TabelRekapGaji, type RekapGajiData } from '../../../components/ui/tabel/tabelGaji/TabelRekapGaji';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { string, toJSONSchema } from 'zod';
 
 const formatRupiah = (angka: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
 };
 
-// Nama variabel diubah menjadi dummyRekapGaji
-const dummyRekapGaji: RekapGajiData[] = [
-    { id: 1, nama: "Adies", jabatan: "Admin 1", gaji_dasar: 3500000, total_bonus: 500000, total_potongan: 0, gaji_bersih: 4000000, status: "Dibayar" },
-    { id: 2, nama: "Fitria", jabatan: "Molder 1", gaji_dasar: 3200000, total_bonus: 300000, total_potongan: 50000, gaji_bersih: 3450000, status: "Pending" },
-    { id: 3, nama: "Budi Santoso", jabatan: "Satpam", gaji_dasar: 2800000, total_bonus: 400000, total_potongan: 0, gaji_bersih: 3200000, status: "Pending" },
-    { id: 4, nama: "Citra Lestari", jabatan: "Teknisi Mesin", gaji_dasar: 4000000, total_bonus: 200000, total_potongan: 150000, gaji_bersih: 4050000, status: "Pending" },
-    { id: 5, nama: "Dedi Kurniawan", jabatan: "Helper", gaji_dasar: 2500000, total_bonus: 250000, total_potongan: 20000, gaji_bersih: 2730000, status: "Dibayar" },
-];
 
-const dummyJabatan: MasterGajiData[] = [
-    { id: "jbt-1", nama_jabatan: "Admin 1", departemen: "Administrasi" },
-    { id: "jbt-2", nama_jabatan: "Satpam", departemen: "Administrasi" },
-    { id: "jbt-3", nama_jabatan: "Molder 1", departemen: "Produksi" },
-    { id: "jbt-4", nama_jabatan: "Helper", departemen: "Produksi" },
-    { id: "jbt-5", nama_jabatan: "Teknisi Mesin", departemen: "Maintenance" },
-];
 
 export default function GajiTunjanganIndex() {
     const navigate = useNavigate();
     const location = useLocation();
+    const token = useAuthStore((state) => state.token);
     
     // State tab diubah dari 'payroll' menjadi 'rekap'
     const [activeTab, setActiveTab] = useState<'rekap' | 'master'>(location.state?.tab || 'rekap');
     const [periode, setPeriode] = useState("bulan"); 
     const [filterValue, setFilterValue] = useState(""); 
+
+    // State Penampung Data Utama
+    const [rekapGajiData, setRekapGajiData] = useState<RekapGajiData[]>([]);
+    const [masterJabatanData, setMasterJabatanData] = useState<MasterGajiData[]>([]);
+
+    // State Loading
+    const [isLoadingRekap, setIsLoadingRekap] = useState(false);
+    const [isLoadingMaster, setIsLoadingMaster] = useState(false);
+
+    // State Finansial Ringkasan (Widgets)
+    const [summaryCards, setSummaryCards] = useState({
+        estimasiPengeluaran: 0,
+        totalBonus: 0,
+        totalPotongan: 0
+    });
+
+    const fectchMasterJabatan = useCallback(async () => {
+        try {
+            setIsLoadingMaster(true)
+            const response = await fetch (`http://localhost:3000/api/v1/jabatan`, {
+                method: "GET",
+                headers: {
+                    "Content-Type" : "application/json",
+                    "Authorization" : `Bearer ${token}`
+                }
+            });
+
+            const result = await response.json();
+
+            if(response.ok) {
+                const formattedData : MasterGajiData[] = result.map((item:any) => ({
+                    id: String(item.id),
+                    nama_jabatan: item.nama_jabatan,
+                    departemen: item.departemen?.nama_departemen || "Umum"
+                }));
+                setMasterJabatanData(formattedData);
+            }
+        } catch (error) {
+            console.error("Gagal memuat master jabatan:", error);
+        } finally{
+            setIsLoadingMaster(false);
+        }
+    }, [token]);
+
+    const fetchRekapGaji = useCallback ( async (currentPeriode: string, valueWaktu: string) => {
+        try {
+            setIsLoadingRekap(true)
+
+            let url = `http://localhost:3000/api/v1/gaji/rekap?periode=${currentPeriode}`;
+            if(valueWaktu){
+                url += `&waktu=${valueWaktu}`;
+            }
+
+            const response = await fetch(url, {
+                method: "GET",
+                headers: {
+                    "Content-Type" : "application/json",
+                    "Authorization" : `Bearer ${token}`
+                }
+            });
+
+            const result = await response.json();
+
+            if(response.ok && result.success){
+                setRekapGajiData(result.data || []);
+                
+
+                // Set data widget atas secara dinamis dari akumulasi total data rekap backend
+                setSummaryCards({
+                    estimasiPengeluaran: result.statistik?.total_pengeluaran || 0,
+                    totalBonus: result.statistik?.total_bonus || 0,
+                    totalPotongan: result.statistik?.total_potongan || 0
+                });
+            }
+        } catch (error) {
+            console.error("Gagal memuat rekap gaji:", error);
+        } finally{
+            setIsLoadingRekap(false);
+        }
+    }, [token]);
+    
+    useEffect(() => {
+        if (activeTab === `master`) {
+
+            if(masterJabatanData.length === 0 ){
+                fectchMasterJabatan();
+            }
+        } else if (activeTab === `rekap`) {
+            
+            if(rekapGajiData.length === 0) {
+                fetchRekapGaji(periode, filterValue);
+            }
+        }
+    }, [activeTab]);
 
     const handlePeriodeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setPeriode(e.target.value);
@@ -142,7 +224,7 @@ export default function GajiTunjanganIndex() {
                         </div>
 
                         {/* PANGGIL KOMPONEN TABEL REKAP GAJI DI SINI */}
-                        <TabelRekapGaji data={dummyRekapGaji} />
+                        <TabelRekapGaji data={rekapGajiData} />
 
                     </section>
                 </div>
@@ -156,7 +238,7 @@ export default function GajiTunjanganIndex() {
                         <p className="text-sm text-gray-500 mb-6">Atur nominal gaji pokok, tunjangan, dan bonus berdasarkan masing-masing jabatan.</p>
                         
                         {/* PANGGIL KOMPONEN TABEL MASTER GAJI DI SINI */}
-                        <TabelMasterGaji data={dummyJabatan} onAturGaji={handleNavigasiAturGaji} />
+                       <TabelMasterGaji data={masterJabatanData} onAturGaji={handleNavigasiAturGaji} />
 
                     </div>
                 </div>

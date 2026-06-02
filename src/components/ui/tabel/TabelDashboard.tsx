@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { 
     DataGrid, 
     type GridColDef, 
@@ -10,28 +10,25 @@ import {
 
 } from "@mui/x-data-grid";
 import { Pencil, Save,  X } from "lucide-react";
+import type { AbsensiData } from "../../../types";
 
-
-
-interface AbsensiItem {
-    id: number;
-    nama: string;
-    masuk: string;
-    status: string;
-    pulang: string;
-    lembur: string;
-}
 
 
 interface TabelAbsensiProps {
-    data: AbsensiItem[];
+    data: AbsensiData[];
+    onRefresh: () => void; 
+    
 }
 
-export default function TabelAbsensi({ data: initialData }: TabelAbsensiProps) {
+export default function TabelDashboard({ data: initialData, onRefresh }: TabelAbsensiProps) {
 
     // State untuk menyimpan data baris dan mode edit dari MUI DataGrid
-    const [rows, setRows] = useState<AbsensiItem[]>(initialData);
+    const [rows, setRows] = useState<AbsensiData[]>(initialData);
     const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
+
+    useEffect(() => {
+        setRows(initialData);
+    }, [initialData]);
 
     // --- FUNGSI-FUNGSI AKSI ---
 
@@ -55,11 +52,16 @@ export default function TabelAbsensi({ data: initialData }: TabelAbsensiProps) {
 
 
     // --- FUNGSI UPDATE DATA KE STATE ---
-    const processRowUpdate = (newRow: GridRowModel) => {
-        const updatedRow = { ...newRow } as AbsensiItem;
+    const processRowUpdate = async (newRow: GridRowModel) => {
+        const updatedRow = { ...newRow } as AbsensiData;
         setRows(rows.map((row) => (row.id === newRow.id ? updatedRow : row)));
+        
+        console.log("Mencoba simpan data baru:", updatedRow); 
+        
+        // Nanti di sini tempat kamu naruh fungsi Fetch / Axios metode PUT untuk simpan ke backend
+        // Setelah berhasil:
+        // onRefresh(); // <--- Ini akan menyuruh Parent langsung narik data ulang (Layar kedip up-to-date!)
 
-        console.log("Data berhasil diubah:", updatedRow); // Nanti ganti dengan fungsi API/Axios ke backend
         return updatedRow;
     };
     const handleRowModesModelChange = (newRowModesModel: GridRowModesModel) => {
@@ -67,13 +69,13 @@ export default function TabelAbsensi({ data: initialData }: TabelAbsensiProps) {
     };
 
     const columns: GridColDef[] = [
-        { field: "id", headerName: "NO", width: 70, align: "center", headerAlign:"center" },
+        { field: "id", headerName: "ID", width: 70, align: "center", headerAlign:"center" },
         { field: "nama", headerName: "Nama", flex: 1, minWidth: 150 },
         { field: "masuk", headerName: "Waktu Masuk", flex: 1, minWidth: 150, align: "center", headerAlign: "center",  },
         {
             field: 'status',
             headerName: 'Status',
-            valueOptions: ["Tepat", "Terlambat",],
+            valueOptions: ["Tepat", "Void", "Terlambat",],
             type: 'singleSelect',
             editable: true,
             flex: 1, 

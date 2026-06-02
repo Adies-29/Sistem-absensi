@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // <-- Import useNavigate
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
     DataGrid, 
     type GridColDef, 
@@ -9,35 +9,23 @@ import {
     type GridRowId, 
     type GridRowModel 
 } from '@mui/x-data-grid';
-import { Pencil, Trash2, Save, X, Eye, Building2, Factory, Settings } from 'lucide-react';
+import { Pencil, Trash2, Save, X, Eye,} from 'lucide-react';
+import type { DepartemenData } from '../../../../types';
 
 // --- INTERFACES ---
-export interface KaryawanDetail {
-    id: string;
-    nama: string;
-    jabatan: string;
-    shift: string;
-}
-
-export interface DepartemenItem {
-    id: string;
-    nama: string;
-    total_karyawan: number;
-    karyawan: KaryawanDetail[];
-}
-
 interface DepartemenTableProps {
-    data?: DepartemenItem[];
+    data?: DepartemenData[];
 }
 
 export default function DepartemenTable({ data: initialData = [] }: DepartemenTableProps) {
-    const [rows, setRows] = useState<DepartemenItem[]>(initialData);
+    const [rows, setRows] = useState<DepartemenData[]>(initialData);
     const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
-    
-    // <-- State Pop-up sudah dihapus -->
-    
     const navigate = useNavigate(); // <-- Inisialisasi fungsi navigasi
 
+    useEffect(() => {
+        setRows(initialData);
+    }, [initialData]);
+    
     // --- FUNGSI-FUNGSI AKSI (MUI DataGrid) ---
     const handleEditClick = (id: GridRowId) => () => {
         setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } });
@@ -47,17 +35,34 @@ export default function DepartemenTable({ data: initialData = [] }: DepartemenTa
         setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
     };
 
-    const handleCancelClick = (id: GridRowId) => () => {
+   const handleCancelClick = (id: GridRowId) => () => {
         setRowModesModel({
             ...rowModesModel,
             [id]: { mode: GridRowModes.View, ignoreModifications: true },
         });
+
     };
 
-    const handleDeleteClick = (id: GridRowId) => () => {
-        const isConfirm = window.confirm("Apakah Anda yakin ingin menghapus departemen ini?");
-        if (isConfirm) {
-            setRows(rows.filter((row) => row.id !== id));
+    const handleDeleteClick = (id: GridRowId) =>  async () => {
+       const isConfirm = window.confirm("Yakin gak??")
+
+        if (!isConfirm) return;
+
+        try {
+            const response =await fetch(`http://localhost:3000/api/v1/departemen/${id}`, {
+                method:"DELETE"
+            });
+            const result = await response.json();
+
+            if (response.ok){
+                alert("Departemen berhasil dihapus");
+                setRows(rows.filter((row) => row.id !== id));
+            }else{
+                alert(`Gagal hapus: ${result.message}`);
+            }
+        } catch (error) {
+            console.error("Error delete :", error);
+            alert("Error server");
         }
     };
 
@@ -67,41 +72,59 @@ export default function DepartemenTable({ data: initialData = [] }: DepartemenTa
         navigate(`/dashboard/departemen/${id}`); 
     };
 
-    const processRowUpdate = (newRow: GridRowModel) => {
-        const updatedRow = { ...newRow } as DepartemenItem;
-        setRows(rows.map((row) => (row.id === newRow.id ? updatedRow : row)));
-        console.log("Departemen berhasil diubah:", updatedRow);
-        return updatedRow;
+    const processRowUpdate = async (newRow: GridRowModel, oldRow: GridRowModel) => {
+        const updatedRow = { ...newRow } as DepartemenData;
+        if (oldRow.nama_departemen === newRow.nama_departemen){
+            return oldRow;
+        }
+
+        try {
+            const response = await fetch (`http://localhost:3000/api/v1/departemen/${newRow.id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    nama_departemen: newRow.nama_departemen
+                }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok){
+                setRows(rows.map((row) =>
+                (row.id === newRow.id ? updatedRow : row)));
+                alert("Departemen berhasil diperbarui!");
+                return updatedRow;
+            }else{
+                alert(`Departemen gagal diperbarui!: ${result.message}`);
+                return oldRow;
+            }
+        } catch (error) {
+            console.error("Error updating departemen:", error);
+            alert("Terjadi kesalahan saat menghubungi server.");
+            return oldRow; 
+        }    
     };
 
     const handleRowModesModelChange = (newRowModesModel: GridRowModesModel) => {
         setRowModesModel(newRowModesModel);
     };
 
-    // --- DEFINISI KOLOM ---
+  
     const columns: GridColDef[] = [
-        // { field: 'id', headerName: 'ID', width: 90 },
+
         { 
-            field: 'nama', 
+            field: 'nama_departemen', 
             headerName: 'Departemen', 
             flex: 1, 
             minWidth: 200, 
             editable: true,
             renderCell: (params) => {
-                const nama = params.value as string;
-                const namaLower = nama.toLowerCase();
-                let Icon = Settings;
-                let color = "text-orange-500";
-                
-                if (namaLower.includes('admin')) { Icon = Building2; color = "text-green-500"; }
-                else if (namaLower.includes('produksi')) { Icon = Factory; color = "text-blue-600"; }
-                
+                const nama = String(params.value || ''); 
                 return (
                     <div className="flex items-center gap-3 h-full">
-                        <div className="p-1 border border-gray-200 rounded-md bg-white shadow-sm">
-                            <Icon size={16} className={color} />
-                        </div>
-                        <span className="font-medium">{nama}</span>
+                        <span className="font-bold">{nama || '-'}</span> 
                     </div>
                 );
             }
@@ -112,7 +135,7 @@ export default function DepartemenTable({ data: initialData = [] }: DepartemenTa
             width: 150, 
             align: 'center', 
             headerAlign: 'center',
-            renderCell: (params) => <span className="font-bold">{params.value}</span>
+            renderCell: (params) => <span className="font-bold">{params.value || 0}</span>
         },
         {
             field: 'actions',
@@ -140,13 +163,6 @@ export default function DepartemenTable({ data: initialData = [] }: DepartemenTa
                 }
 
                 return [
-                    // Tombol Mata sekarang memicu pindah halaman
-                    <GridActionsCellItem
-                        icon={<Eye size={18} className="text-blue-500 hover:text-blue-700" />}
-                        label="Lihat Karyawan"
-                        onClick={handleViewEmployees(id)} 
-                        color="inherit"
-                    />,
                     <GridActionsCellItem
                         icon={<Pencil size={18} className="text-gray-600 hover:text-black" />}
                         label="Edit"

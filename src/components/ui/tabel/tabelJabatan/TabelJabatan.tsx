@@ -1,41 +1,60 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { 
-    DataGrid, 
-    type GridColDef, 
-    type GridRowModesModel, 
-    GridRowModes, 
+import {
+    DataGrid,
+    type GridColDef,
+    type GridRowModesModel,
+    GridRowModes,
     GridActionsCellItem,
-    type GridRowId 
+    type GridRowId,
+    type GridRowModel
 } from '@mui/x-data-grid';
-import {  Pencil, Trash2, Save, X } from 'lucide-react';
+import { Pencil, Trash2, Save, X } from 'lucide-react';
+import { useAuthStore } from '../../../../store/useAuthStore';
+import type { JabatanData } from '../../../../types';
 
 interface TabelJabatanProps {
-    data: any[];
+    data: JabatanData[];
 }
 
+
 export default function TabelJabatan({ data: initialData }: TabelJabatanProps) {
-    
-
-    // 1. STATE MANAGEMENT UNTUK TABEL CRUD
-    // Menyimpan data tabel (karena nanti bisa diedit/dihapus secara lokal sebelum ke backend)
+    const [departemenOptions, setDepartemenOptions] = useState<{value: number, label: string}[]>([]);
     const [rows, setRows] = useState(initialData);
-    
-    // Menyimpan status baris mana saja yang sedang dalam mode "Edit"
-    const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
+    const [rowModesModel, setRowModesModel] = useState<GridRowModel>({});
+    const token = useAuthStore((state) => state.token);
 
-    // --- 2. KUMPULAN FUNGSI HANDLER ---
+    useEffect(() => {
+        setRows(initialData);
+    }, [initialData]);
 
-    // Saat tombol Edit (Pensil) diklik
+    useEffect(() => {
+        const fetchDepartemen = async () => {
+            try {
+                const response = await fetch("http://localhost:3000/api/v1/departemen"); 
+                const result = await response.json();const options = result.data.map((dept: any) => ({
+                    value: dept.id,
+                    label: dept.nama_departemen
+                }));
+                setDepartemenOptions(options);
+                
+            } catch (error) {
+                console.error("Gagal ambil opsi departemen:", error);
+            }
+        };
+        fetchDepartemen();
+    }, []);
+
+
+
+    // tombol Edit 
     const handleEditClick = (id: GridRowId) => () => {
         setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } });
     };
 
-    // Saat tombol Save (Centang/Simpan) diklik
-    const handleSaveClick = (id: GridRowId) => () => {
+    //tombol Save
+    const handleSaveClick = (id: GridRowId) => async () => {
         setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
-        // NOTE: Di sini nantinya kamu akan memanggil API Backend (Axios/Fetch) 
-        // untuk meng-update data di database MySQL kamu.
     };
 
     // Saat tombol Cancel (Silang) diklik
@@ -44,67 +63,130 @@ export default function TabelJabatan({ data: initialData }: TabelJabatanProps) {
             ...rowModesModel,
             [id]: { mode: GridRowModes.View, ignoreModifications: true },
         });
-
-        // Opsional: Jika baris itu adalah baris baru (isNew), hapus dari tabel jika dibatalkan
         const editedRow = rows.find((row) => row.id === id);
         if (editedRow?.isNew) {
             setRows(rows.filter((row) => row.id !== id));
         }
     };
 
-    // Saat tombol Delete (Tong Sampah) diklik
-    const handleDeleteClick = (id: GridRowId) => () => {
-        if(window.confirm("Apakah Anda yakin ingin menghapus jabatan ini?")) {
-            setRows(rows.filter((row) => row.id !== id));
-            // NOTE: Di sini nantinya kamu akan memanggil API Backend DELETE
+    //tombol Delete 
+    const handleDeleteClick = (id: GridRowId) => async () => {
+        const isConfirm = window.confirm("Apakah Anda yakin ingin menghapus jabatan ini?");
+        if (!isConfirm) return;
+
+        try {
+            const response = await fetch(`http://localhost:3000/api/v1/jabatan/${id}`, {
+                method: 'DELETE',
+            });
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                alert("Jabatan berhasil dihapus!");
+                setRows((prevRows) => prevRows.filter((row) => String(row.id) !== String(id)))
+            } else {
+                alert(`Gagal hapus: ${result.message}`);
+            }
+        } catch (error) {
+            alert("Gagal menghapus data.");
+            alert("Terjadi kesalahan server.");
         }
     };
 
-    
-
-
     // Fungsi penting yang dijalankan MUI setelah data selesai diedit di tabel
-    const processRowUpdate = (newRow: any) => {
-        const updatedRow = { ...newRow, isNew: false };
-        setRows(rows.map((row) => (row.id === newRow.id ? updatedRow : row)));
-        return updatedRow;
+    const processRowUpdate = async (newRow: GridRowModel, oldRow: GridRowModel) => {
+        const updatedRow = { ...newRow } as JabatanData;
+        if (oldRow.nama_jabatan === newRow.nama_jabatan && oldRow.departemen_id === newRow.departemen_id){
+            return oldRow; 
+        }
+
+        try {
+            const response = await fetch (`http://localhost:3000/api/v1/jabatan/${newRow.id}`, {
+                method: "PUT",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}` 
+                },
+                body: JSON.stringify({
+                    nama_jabatan: newRow.nama_jabatan,
+                    departemen_id: Number(newRow.departemen_id) 
+                }),
+            });
+            
+            const result = await response.json();
+
+            if (response.ok){
+                // Update UI Lokal
+                const selectedDeptName = departemenOptions.find(opt => opt.value === Number(newRow.departemen_id))?.label;
+                if (selectedDeptName) {
+                    updatedRow.departemen = { nama_departemen: selectedDeptName };
+                }
+
+                // Perbarui state 'rows'
+                setRows((prevRows) => 
+                    prevRows.map((row) => (String(row.id) === String(newRow.id) ? updatedRow : row))
+                );
+                return updatedRow; 
+            } else {
+                alert(`Jabatan gagal diperbarui: ${result.message}`);
+                return oldRow;
+            }
+        } catch (error) {
+            console.error("Error updating jabatan:", error);
+            alert("Terjadi kesalahan saat menghubungi server.");
+            return oldRow;
+        } 
     };
 
 
     // --- 3. DEFINISI KOLOM ---
     const columns: GridColDef[] = [
-        { 
-            field: 'nama_jabatan', 
-            headerName: 'Nama Jabatan', 
-            flex: 1, 
+        {
+            field: 'nama_jabatan',
+            headerName: 'Nama Jabatan',
+            flex: 1,
             minWidth: 180,
-            editable: true, // Beri tahu MUI bahwa kolom ini bisa diedit!
+            editable: true,
             renderCell: (params) => (
                 <span className="font-medium text-gray-800">{params.value}</span>
             )
         },
-        { 
-            field: 'departemen', 
-            headerName: 'Departemen', 
-            flex: 1, 
+        {
+            field: 'departemen_id',
+            headerName: 'Departemen',
+            flex: 1,
             minWidth: 150,
-            editable: true, // Bisa diedit (Idealnya ini pakai tipe 'singleSelect' dropdown)
-            
+            editable: true,
+            type: 'singleSelect',
+            valueOptions: departemenOptions,
+            renderCell: (params) => {
+                let namaDept = params.row.departemen?.nama_departemen;
+                if (!namaDept && params.value) {
+                    const matchedDept = departemenOptions.find(
+                        (opt) => String(opt.value) === String(params.value)
+                    );
+                    namaDept = matchedDept?.label;
+                }
+                return (
+                    <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">
+                        {namaDept || "--"}
+                    </span>
+                );
+            }
         },
-        { 
-            field: 'jumlah_karyawan', 
-            headerName: 'Jumlah Karyawan', 
-            flex: 1, 
+        {
+            field: 'jumlah_karyawan',
+            headerName: 'Jumlah Karyawan',
+            flex: 1,
             minWidth: 150,
             align: 'center',
             headerAlign: 'center',
-            editable: false, // Biasanya jumlah karyawan tidak bisa diedit manual, otomatis dari sistem
+            editable: false,
             renderCell: (params) => (
-                <span>{params.value} Orang</span>
+                <span>{params.value || 0} Orang</span>
             )
         },
         {
-            field: 'actions', // Sesuai kodemu
+            field: 'actions', 
             type: 'actions',
             headerName: 'Aksi',
             width: 140,
@@ -149,23 +231,27 @@ export default function TabelJabatan({ data: initialData }: TabelJabatanProps) {
     return (
         <DataGrid
             autoHeight
-            rows={rows} // Gunakan state `rows`, JANGAN `data` dari props
+            rows={rows} 
             columns={columns}
             showToolbar
-            
+
             // Pengaturan CRUD Inline Editing
             editMode="row"
             rowModesModel={rowModesModel}
             onRowModesModelChange={(newModel) => setRowModesModel(newModel)}
             processRowUpdate={processRowUpdate}
 
+            onProcessRowUpdateError={(error) => {
+                console.error("Gagal saat update baris:", error);
+            }}
+
             initialState={{
                 pagination: { paginationModel: { page: 0, pageSize: 5 } },
             }}
-            pageSizeOptions={[5, 10]}
+            pageSizeOptions={[5, 10]}   
             disableRowSelectionOnClick
             sx={{
-                border: 'none', 
+                border: 'none',
                 '& .MuiDataGrid-columnHeaders': {
                     backgroundColor: '#f9fafb',
                     color: 'black',

@@ -1,52 +1,59 @@
 import { useNavigate } from "react-router-dom";
 import Button from '../../../components/ui/Button';
-import { TabelJadwalShift, type ShiftData,  } from '../../../components/ui/tabel/tabelJadwalShif/TabelJadwalShif';
+import type { JadwalShiftData } from "../../../types";
+import TabelJadwalShift from "../../../components/ui/tabel/tabelJadwalShif/TabelJadwalShif";
+import { useEffect, useState } from "react";
+import { useAuthStore } from "../../../store/useAuthStore";
+import { Loader2 } from "lucide-react";
 
 export default function JadwalShiftIndex() {
     const navigate = useNavigate();
+    const [dataJadwalShift, setDataJadwalShift] = useState<JadwalShiftData[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [errorMsg, setErrorMsg] = useState("");
+    
 
-    // Data dummy sesuai dengan interface ShiftData yang baru
-    const jadwalData: ShiftData[] = [
-        {
-            id: 1,
-            kode_shift: "SHIFT_PAGI",
-            jam_masuk: "07:00",
-            jam_pulang: "15:00",
-            lintas_hari: false,
-            is_potong_gaji_terlambat: true,
-            denda_terlambat_per_menit: 1000
-        },
-        {
-            id: 2,
-            kode_shift: "SHIFT_MALAM",
-            jam_masuk: "23:00",
-            jam_pulang: "07:00",
-            lintas_hari: true,
-            is_potong_gaji_terlambat: true,
-            denda_terlambat_per_menit: 1500
-        },
-        {
-            id: 3,
-            kode_shift: "NORMAL_DAY",
-            jam_masuk: "08:00",
-            jam_pulang: "16:00",
-            lintas_hari: false,
-            is_potong_gaji_terlambat: false,
-            denda_terlambat_per_menit: 0
-        }
-    ];
+   // Fungsi FETCH dari Backend ( Kunci Token)
+       const fetchJadwalShift = async () => {
+           setIsLoading(true);
+           setErrorMsg("");
+   
+           try {
+               // Ambil token dari memori browser
+               const token = useAuthStore.getState().token;
+               const response = await fetch ("http://localhost:3000/api/v1/shifts", {
+                   method: "GET",
+                   headers: {
+                       "Content-Type" : "application/json",
+                       "Autorization" : `Bearer${token}`
+                   }
+               });
+               if (!response.ok){
+                   if(response.status === 401 || response.status === 403){
+                       throw new Error ("Sesi Anda telah habis. Silakan login kembali !")
+                   }
+                   throw new Error ("Gagal memuat data dari server")
+               }
+   
+               const result = await response.json();
+               if (result.success){
+                   setDataJadwalShift(result.data);
+               }
+   
+           } catch (error: any) {
+               console.error("Error fetching Jadwal & shift:", error);
+               setErrorMsg(error.message || "Gagal memuat data pegawai.");
+           }finally{
+               setIsLoading(false);
+           }
+       };
+   
+       useEffect(() => {
+           fetchJadwalShift();
+       }, []);
+    
 
-    const handleEdit = (id: number | string) => {
-        navigate(`/dashboard/jadwal-shift/edit/${id}`);
-    };
-
-    const handleDelete = (id: number | string) => {
-        const confirmDelete = window.confirm("Yakin ingin menghapus shift ini?");
-        if (confirmDelete) {
-            console.log("Hapus shift dengan ID:", id);
-            alert("Shift berhasil dihapus! (Simulasi)");
-        }
-    };
+    
 
     return (
         <div className="flex flex-col gap-6 w-full p-2">
@@ -71,11 +78,19 @@ export default function JadwalShiftIndex() {
             </div>
 
             {/* PEMANGGILAN KOMPONEN TABEL */}
-            <TabelJadwalShift 
-                data={jadwalData} 
-                onEdit={handleEdit} 
-                onDelete={handleDelete} 
-            />
+            {errorMsg ? (
+                    <div className="bg-red-50 text-red-600 p-4 rounded-lg text-center font-medium">
+                        {errorMsg}
+                    </div>
+                ) : isLoading ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                        <Loader2 className="animate-spin mb-4 text-red-600" size={32} />
+                        <p>Memuat data Jadwal & Shift...</p>
+                    </div>
+                ) : (
+                    // Panggil komponen tabelnya
+                    <TabelJadwalShift data={dataJadwalShift} onRefresh={fetchJadwalShift} />
+                )} 
             
         </div>
     );

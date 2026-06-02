@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import Button from "../../../components/ui/Button";
 import { useParams, useNavigate } from 'react-router-dom';
 
-export default function DetailKaryawan(){
+export default function DetailPegawai(){
     const { id } = useParams();
     const navigate = useNavigate();
    // 1. Data utama (Nanti dari Backend/Zustand)

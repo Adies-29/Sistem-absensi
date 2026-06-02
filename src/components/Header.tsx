@@ -11,7 +11,7 @@ export default function Header() {
         const fetchShiftData = async () => {
             try {
                 setIsLoading(true);
-                const response = await fetch(""); 
+                const response = await fetch("http://localhost:3000/api/v1/shifts"); 
                 if (!response.ok) throw new Error("Backend tidak merespons");
                 
                 const data = await response.json();
@@ -84,11 +84,11 @@ export default function Header() {
                 </div>
             </div>
 
-            {/* TENGAH: Lempar data ke DateTime */}
+
             {/* 5. Tampilkan DateTime HANYA jika showDate bernilai true */}
             {currentRoute.showDate && (
                 <div className="w-full md:w-auto flex justify-center">
-                    <DateTime shift={currentShift} isLoading={isLoading} />
+                    <DateTime />
                 </div>
             )}
 

@@ -1,59 +1,59 @@
 import { useNavigate } from "react-router-dom";
 import Button from "../../../components/ui/Button";
 import TabelDepartemen from "../../../components/ui/tabel/tabelDepartemen/TabelDepartemen";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
+import type { DepartemenData } from "../../../types";
 
 
 
 export default function DepartemenIndex() {
     const navigate = useNavigate();
 
+    // 2. State untuk menyimpan data dari Database & status Loading
+    const [dataDepartemen, setDataDepartemen] = useState<DepartemenData[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
+    const fetchDepartemen = async () => {
+        setIsLoading(true);
+        try {
+            // Tembak API Backend
+            const response = await fetch("http://localhost:3000/api/v1/departemen", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    // "Authorization": `Bearer ${localStorage.getItem('token')}` // Gunakan ini nanti jika butuh login
+                }
+            });
 
-    const dummyDepartemen = [
-        {
-            id: "dept-1",
-            nama: "Administrasi",
-            total_karyawan: 3,
-            karyawan: [
-                { id: "k-1", nama: "Nadine", jabatan: "Admin 1", shift: "1" },
-                { id: "k-2", nama: "Abigail", jabatan: "Admin 2", shift: "2" },
-                { id: "k-3", nama: "Vivian", jabatan: "Admin 3", shift: "1" },
-            ]
-        },
-        {
-            id: "dept-2",
-            nama: "Produksi",
-            total_karyawan: 20,
-            karyawan: [
-                { id: "k-4", nama: "Budi Santoso", jabatan: "Molder 1", shift: "1" },
-                { id: "k-5", nama: "Siti Aminah", jabatan: "Packer 1", shift: "2" },
-                { id: "k-6", nama: "Joko Widodo", jabatan: "Helper", shift: "1" },
-            ]
-        },
-        {
-            id: "dept-3",
-            nama: "Maintenance",
-            total_karyawan: 2,
-            karyawan: [
-                { id: "k-7", nama: "Agus Teknisi", jabatan: "Teknisi Mesin", shift: "1" },
-                { id: "k-8", nama: "Hendra Listrik", jabatan: "Teknisi Listrik", shift: "2" },
-            ]
+            if (!response.ok) {
+                throw new Error("Gagal memuat data dari server");
+            }
+
+            const result = await response.json();
+            
+            // 4. MAPPING DATA: Sesuaikan bentuk data backend ke bentuk dummy-mu sebelumnya
+            const mappedData: DepartemenData[] = result.data.map((item: any) => ({
+                id: item.id,
+                nama_departemen: item.nama_departemen,
+                jumlah_Jabatan: item.jumlah_jabatan || 0 
+            }));
+
+            setDataDepartemen(mappedData);
+
+        } catch (error) {
+            console.error("Error fetching jabatan:", error);
+            alert("Gagal memuat data Departemen. Pastikan backend berjalan.");
+        } finally {
+            setIsLoading(false);
         }
-    ];
-    const dataUntukTabel = dummyDepartemen.map((dept) => {
-        // Ambil semua nama jabatan dari array karyawan
-        const semuaJabatan = dept.karyawan.map(k => k.jabatan);
-        // Gunakan Set() untuk menyaring jabatan yang kembar (mengambil yang unik saja)
-        const jabatanUnik = new Set(semuaJabatan); 
+    };
+    // 5. Jalankan Fetch saat halaman dibuka
+    useEffect(() => {
+        fetchDepartemen();
+    }, []);
 
-        return {
-            ...dept, // Bawa data aslinya (id, nama, total_karyawan)
-            jumlah_jabatan: jabatanUnik.size // Tambahkan data baru: jumlah jabatan unik
-        };
-    });
-
-    // Menghitung jumlah karyawan dari data (nantinya ini dari backend)
-    const totalDepartemen = dummyDepartemen.length;
+    const totalDepartemen = dataDepartemen.length;
 
     return (
         <div className="flex flex-col gap-6 w-full">
@@ -85,7 +85,14 @@ export default function DepartemenIndex() {
                 </div>
 
                 {/* 3. PEMANGGILAN KOMPONEN TABEL */}
-                <TabelDepartemen data={dataUntukTabel} />
+                {isLoading ? (
+    <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+        <Loader2 className="animate-spin mb-4 text-red-600" size={32} />
+        <p>Memuat data dari database...</p>
+    </div>
+) : (
+    <TabelDepartemen data={dataDepartemen} />
+)}
 
             </section>
         </div>
